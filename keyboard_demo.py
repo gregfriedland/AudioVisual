@@ -17,6 +17,9 @@ DEBUG = False
 CAPTION = "AudioVisual: keyboard"
 SCREEN_SIZE = (1024, 640)
 BACKGROUND_COLOR = (0, 0, 0)
+VAMP_PLUGIN = "qm-vamp-plugins:qm-transcription"
+#VAMP_PLUGIN = "silvet:silvet"
+#VAMP_PLUGIN = "ua-vamp-plugins:mf0ua"
 
 SAMPLE_RATE = 22050 # pygame seems unable to play at 44100 on my laptop
 CHANNELS = 2
@@ -36,8 +39,8 @@ class NoteManager(object):
         self.primed = False
 
     def add(self, note):
-        self.primed = False
         self.notes.append(note)
+        self.primed = False
 
     def prime(self):
         self.notes.sort(key=lambda note: -note.start_time)
@@ -51,6 +54,7 @@ class NoteManager(object):
         while len(self.notes) > 0 and curr_time >= self.notes[-1].start_time:
             curr_notes.append(self.notes.pop())
         return curr_notes
+
 
 def loadSound(filename, sample_rate, channels):
     FFMPEG_BIN = "ffmpeg"
@@ -82,7 +86,9 @@ def startSound(audio_array, sample_rate, channels):
 
 
 def analyzeAudio(audio_array, sample_rate, channels):
-    if DEBUG: print vamp.list_plugins()
+    print "Found Vamp plugins:"
+    for name in vamp.list_plugins():
+        print "  " + name
 
     # import librosa    
     # audio_array3, sample_rate = librosa.load("/Users/gregfriedland/Downloads/8081.wav")
@@ -93,13 +99,19 @@ def analyzeAudio(audio_array, sample_rate, channels):
     audio_array2 = audio_array2.reshape((len(audio_array2)/channels,channels))[:,0]
 
     if False:
+        # chucnked
         results = []
         for subarray in numpy.array_split(audio_array2, numpy.ceil(audio_array2.shape[0] / float(BUFFER_SIZE)), axis=0):
             if DEBUG: print "subarray size: " + str(subarray.shape[0])
             #assert(subarray.shape[0] == BUFFER_SIZE)
-            results += [vamp.collect(subarray, sample_rate, "qm-vamp-plugins:qm-transcription")]
+            results += [vamp.collect(subarray, sample_rate, VAMP_PLUGIN)]
     else:
-        results = vamp.collect(audio_array2, sample_rate, "qm-vamp-plugins:qm-transcription")
+        # all at once
+        results = vamp.collect(audio_array2, sample_rate, VAMP_PLUGIN)
+        if DEBUG: 
+            print "Vamp plugin output:"
+            for result in results["list"][:15]:
+                print "  %s" % result
 
     results = [(float(row["timestamp"]), float(row["duration"]), int(row["values"][0])) for row in results["list"]]
 
@@ -113,13 +125,13 @@ class Sprite(object):
     def get_event(self, event, objects):
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_SPACE:
-                pass # objects.add(Laser(self.rect.center, self.angle))
+                pass
 
     def update(self):
         pass
 
     def draw(self, surface, curr_time):
-        if DEBUG: print "  Drawing sprite: %s at %s" % (self.note, self.location)
+        #if DEBUG: print "  Drawing sprite: %s at %s" % (self.note, self.location)
         intensity = 1 - (curr_time - (self.end_time - self.note.duration)) / self.note.duration
         intensity = min(max(0, intensity), 255)
         #print "Note intensity: id=%d intensity=%.2f" % (self.note.id, intensity)
@@ -140,6 +152,7 @@ class Control(object):
         self.sprites = []
         self.note_mgr = note_mgr
         self.start_time = pg.time.get_ticks() / 1000.0
+        self.font = pg.font.SysFont("monospace", 18)
 
     def time(self):
         return pg.time.get_ticks() / 1000.0 - self.start_time
@@ -178,17 +191,18 @@ class Control(object):
 
     def display_fps(self):
         caption = "{} - FPS: {:.2f}".format(CAPTION, self.clock.get_fps())
-        #print caption
         pg.display.set_caption(caption)
+        label = self.font.render("fps: %.0f" % self.clock.get_fps(), 1, (255,255,255))
+        self.screen.blit(label, (0, 0))
 
     def main_loop(self):
         while not self.done:
             self.event_loop()
             self.update()
             self.draw()
+            self.display_fps()
             pg.display.flip()
             self.clock.tick(self.fps)
-            self.display_fps()
 
 
 if __name__ == "__main__":
@@ -196,19 +210,22 @@ if __name__ == "__main__":
 
     pg.init()
     pg.display.set_caption(CAPTION)
-    pg.display.set_mode(SCREEN_SIZE, FULLSCREEN | DOUBLEBUF)
+    pg.display.set_mode(SCREEN_SIZE, DOUBLEBUF) # |FULLSCREEN | )
     pg.display.get_surface().set_alpha(None)
 
-    # load the sound and analyze it
+    # load the sound
     snd = loadSound(fn, SAMPLE_RATE, CHANNELS)
-    notes = analyzeAudio(snd, SAMPLE_RATE, CHANNELS)
 
-    # create the note manager
+    # analyze the sound and create the note manager
+    notes = analyzeAudio(snd, SAMPLE_RATE, CHANNELS)
     note_mgr = NoteManager()
     for i, (start_time, duration, midi) in enumerate(notes):
         note_mgr.add(Note(i, start_time, duration, midi))
 
+    # start playing the sound
     startSound(snd, SAMPLE_RATE, CHANNELS)
+
+    # start the control loop
     control = Control(note_mgr)
     control.main_loop()
     pg.mixer.quit()
