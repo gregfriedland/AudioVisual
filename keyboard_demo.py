@@ -99,16 +99,12 @@ def analyzeAudio(audio_array, sample_rate, channels):
     for name in vamp.list_plugins():
         print "  " + name
 
-    # import librosa    
-    # audio_array3, sample_rate = librosa.load("/Users/gregfriedland/Downloads/8081.wav")
-    # print "expected shape & range: %s, %f - %f" % (audio_array3.shape, audio_array3.min(), audio_array3.max())
-
     # convert audio array to float format expected by vamp
     audio_array2 = audio_array / float(numpy.iinfo(numpy.int16).max)
     audio_array2 = audio_array2.reshape((len(audio_array2)/channels,channels))[:,0]
 
     if False:
-        # chucnked
+        # chuncked
         results = []
         for subarray in numpy.array_split(audio_array2, numpy.ceil(audio_array2.shape[0] / float(BUFFER_SIZE)), axis=0):
             if DEBUG: print "subarray size: " + str(subarray.shape[0])
@@ -130,6 +126,8 @@ def analyzeAudio(audio_array, sample_rate, channels):
 class Sprite(object):
     def __init__(self, location, size, color, end_time, note):
         self.location, self.size, self.color, self.end_time, self.note = location, size, color, end_time, note
+        self.rect = pg.Rect(location[0], location[1], size[0], size[1])
+        self.surface = pg.Surface(size[0], size[1])
 
     def get_event(self, event, objects):
         if event.type == pg.KEYDOWN:
@@ -145,7 +143,7 @@ class Sprite(object):
         intensity = min(max(0, intensity), 255)
         #print "Note intensity: id=%d intensity=%.2f" % (self.note.id, intensity)
         color = (int(intensity * self.color[0]), int(intensity * self.color[1]), int(intensity * self.color[2]))
-        pg.draw.rect(surface, color, (self.location[0], self.location[1], self.size[0], self.size[1]))
+        pg.draw.rect(self.surface, color, (0, 0, self.size[0], self.size[1]))
 
     def hasExpired(self, curr_time):
         return curr_time > self.end_time
@@ -210,7 +208,9 @@ class Control(object):
             self.update()
             self.draw()
             self.display_fps()
-            pg.display.flip()
+            #pg.display.flip()
+            for sprite in self.sprites:
+                self.screen.blit(sprite.surface, sprite.rect)
             self.clock.tick(self.fps)
 
 
