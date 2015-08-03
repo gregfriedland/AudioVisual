@@ -1,3 +1,11 @@
+# Demo program for wrapping a Vamp plugin to visualize sound data.
+# Uses the 'qm-transcription' Vamp plugin to turn an audio file into
+# a sequence of notes (time of occurence, duration and midi key).
+# This is visualized as a keyboard with each midi note represented by
+# one key.
+
+# Usage keyboard_demo.py <sound-file>
+
 import subprocess as sp
 import numpy
 import sys
@@ -6,36 +14,13 @@ import pygame as pg
 from pygame.locals import FULLSCREEN, DOUBLEBUF
 
 DEBUG = False
-CAPTION = "mp3-viz"
+CAPTION = "AudioVisual: keyboard"
 SCREEN_SIZE = (1024, 640)
 BACKGROUND_COLOR = (0, 0, 0)
 
-SAMPLE_RATE = 22050
+SAMPLE_RATE = 22050 # pygame seems unable to play at 44100 on my laptop
 CHANNELS = 2
 BUFFER_SIZE = 2048
-
-def pg_toggle_fullscreen():
-    screen = pg.display.get_surface()
-    tmp = screen.convert()
-    caption = pg.display.get_caption()
-    cursor = pg.mouse.get_cursor()  # Duoas 16-04-2007 
-    
-    w,h = screen.get_width(),screen.get_height()
-    flags = screen.get_flags()
-    bits = screen.get_bitsize()
-    
-    pg.display.quit()
-    pg.display.init()
-    
-    screen = pg.display.set_mode((w,h),flags^FULLSCREEN,bits)
-    screen.blit(tmp,(0,0))
-    pg.display.set_caption(*caption)
- 
-    pg.key.set_mods(0) #HACK: work-a-round for a SDL bug??
- 
-    pg.mouse.set_cursor( *cursor )  # Duoas 16-04-2007
-    
-    return screen
 
 
 class Note(object):
@@ -205,6 +190,7 @@ class Control(object):
             self.clock.tick(self.fps)
             self.display_fps()
 
+
 if __name__ == "__main__":
     fn = sys.argv[1]
 
@@ -223,7 +209,6 @@ if __name__ == "__main__":
         note_mgr.add(Note(i, start_time, duration, midi))
 
     startSound(snd, SAMPLE_RATE, CHANNELS)
-    #pg_toggle_fullscreen()
     control = Control(note_mgr)
     control.main_loop()
     pg.mixer.quit()
