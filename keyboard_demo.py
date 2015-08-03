@@ -21,7 +21,7 @@ VAMP_PLUGIN = "qm-vamp-plugins:qm-transcription"
 #VAMP_PLUGIN = "silvet:silvet"
 #VAMP_PLUGIN = "ua-vamp-plugins:mf0ua"
 
-SAMPLE_RATE = 22050 # pygame seems unable to play at 44100 on my laptop
+SAMPLE_RATE = 44100
 CHANNELS = 2
 BUFFER_SIZE = 2048
 
@@ -75,13 +75,22 @@ def loadSound(filename, sample_rate, channels):
 
     return audio_array
 
+# pygame seems unable to play at 44100 on my laptop and
+# seems to need 22050
+def startSound(audio_array, in_sample_rate, in_channels, out_sample_rate=22050, out_channels=2):
+    import audioop
 
-def startSound(audio_array, sample_rate, channels):
-    audio_array = audio_array.reshape((len(audio_array)/channels,channels))
+    audio_array2 = audioop.ratecv(audio_array, 2, in_channels, in_sample_rate, out_sample_rate, None)[0]
+    if out_channels == 1:
+        audio_array2 = audioop.tomono(audio_array2, 2, 0.5, 0.5)[0]
+    audio_array3 = numpy.frombuffer(audio_array2, numpy.int16)
 
-    pg.mixer.init(frequency=sample_rate, size=-16, channels=channels)
+    if out_channels > 1:
+        audio_array3 = audio_array3.reshape((len(audio_array3)/out_channels,out_channels))
+
+    pg.mixer.init(frequency=out_sample_rate, size=-16, channels=out_channels)
     if DEBUG: print pg.mixer.get_init()
-    sound = pg.sndarray.make_sound( audio_array )
+    sound = pg.sndarray.make_sound(audio_array3)
     playing = sound.play()    
 
 
@@ -210,7 +219,7 @@ if __name__ == "__main__":
 
     pg.init()
     pg.display.set_caption(CAPTION)
-    pg.display.set_mode(SCREEN_SIZE, DOUBLEBUF) # |FULLSCREEN | )
+    pg.display.set_mode(SCREEN_SIZE) #, DOUBLEBUF | FULLSCREEN)
     pg.display.get_surface().set_alpha(None)
 
     # load the sound
