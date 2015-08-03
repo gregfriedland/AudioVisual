@@ -127,7 +127,6 @@ class Sprite(object):
     def __init__(self, location, size, color, end_time, note):
         self.location, self.size, self.color, self.end_time, self.note = location, size, color, end_time, note
         self.rect = pg.Rect(location[0], location[1], size[0], size[1])
-        self.surface = pg.Surface(size[0], size[1])
 
     def get_event(self, event, objects):
         if event.type == pg.KEYDOWN:
@@ -143,7 +142,7 @@ class Sprite(object):
         intensity = min(max(0, intensity), 255)
         #print "Note intensity: id=%d intensity=%.2f" % (self.note.id, intensity)
         color = (int(intensity * self.color[0]), int(intensity * self.color[1]), int(intensity * self.color[2]))
-        pg.draw.rect(self.surface, color, (0, 0, self.size[0], self.size[1]))
+        return pg.draw.rect(surface, color, self.rect)
 
     def hasExpired(self, curr_time):
         return curr_time > self.end_time
@@ -189,28 +188,36 @@ class Control(object):
             color = (255, 0, 0)
             sprite = Sprite(location, size, color, note.start_time + note.duration, note)
             self.sprites.append(sprite)
-            print "%.2fs Adding sprite: %s (with loc=%s size=%s)" % (self.time(), note, location, size)
+            print "%.2fs Adding sprite (n=%d): %s (with loc=%s size=%s)" % (len(self.sprites), self.time(), note, location, size)
 
     def draw(self):
-        self.screen.fill(BACKGROUND_COLOR)
+        #self.screen.fill(BACKGROUND_COLOR)
+        rects = []
         for sprite in self.sprites:
-            sprite.draw(self.screen, self.time())
+            rects += [sprite.draw(self.screen, self.time())]
+        return rects
 
     def display_fps(self):
         caption = "{} - FPS: {:.2f}".format(CAPTION, self.clock.get_fps())
         pg.display.set_caption(caption)
         label = self.font.render("fps: %.0f" % self.clock.get_fps(), 1, (255,255,255))
-        self.screen.blit(label, (0, 0))
+        return self.screen.blit(label, (0, 0))
 
     def main_loop(self):
+        background_surface = pg.Surface(self.screen_rect.size)
+        background_surface.fill(BACKGROUND_COLOR)
+
+        oldrects = []
         while not self.done:
             self.event_loop()
             self.update()
-            self.draw()
-            self.display_fps()
+            rects = self.draw()
+            fps_rect = self.display_fps()
             #pg.display.flip()
-            for sprite in self.sprites:
-                self.screen.blit(sprite.surface, sprite.rect)
+            pg.display.update(rects + oldrects + [fps_rect])
+            for rect in rects + [fps_rect]:
+                self.screen.blit(background_surface, rect, rect)
+            oldrects = rects          
             self.clock.tick(self.fps)
 
 
@@ -219,7 +226,7 @@ if __name__ == "__main__":
 
     pg.init()
     pg.display.set_caption(CAPTION)
-    pg.display.set_mode(SCREEN_SIZE) #, DOUBLEBUF | FULLSCREEN)
+    pg.display.set_mode(SCREEN_SIZE, DOUBLEBUF | FULLSCREEN)
     pg.display.get_surface().set_alpha(None)
 
     # load the sound
